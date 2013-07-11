@@ -19,14 +19,6 @@ typedef struct {
 typedef NetData* pNetData;
 NetData net1;
 pNetData pnet1=&net1;
-typedef struct 
-{
-	int freq;
-	int power;
-}AotfData;
-typedef AotfData* pAotfData;
-AotfData aotf1={1,1};
-pAotfData paotf1=&aotf1;
 void set_net();
 void printids(const char *s)
 {
@@ -36,15 +28,7 @@ void printids(const char *s)
 	tid=pthread_self();
 	printf("%s pid %u tid %u (0x%x)\n",s,(unsigned int)pid,(unsigned int )tid,(unsigned int)tid);
 }
-void* aotf(void *arg)
-{
-	printids("aotf\n");
-//	while(1)    	
-	{
-		printf("aotf Freq is %d\n",aotf1.freq);
-	}
-	return (void*)0;
-}
+
 void* arb(void *arg)
 {
 	printids("arb thread is \n");
@@ -88,6 +72,7 @@ void handle_request(int sockfd)
 
 }
 
+
 int main(void)
 {
 	int listenfd,connfd;
@@ -96,13 +81,23 @@ int main(void)
 	unsigned int port=8722;
 	int x;
 	
+	pid_t pid_aotf;
+	if(pipe(fd)<0)
+		err_sys("pipe error");
+	if((pid_aotf=fork())<0)
+		err_sys("fork error");
+	else if(pid==0)
+	{
+		close(fd[1]);
+
+	}
+	else
+	{//parent
+		close (fd[0]);
 
 
 
-	pthread_t t_aotf,t_arb;
-	pthread_create(&t_aotf,NULL,aotf,(void*)1);
-//	pthread_create(&t_arb,NULL,arb,(void*)1);
-//
+
 	if((listenfd=socket(AF_INET,SOCK_STREAM,IPPROTO_TCP))==-1)
 	{
 		perror("socket creation error!\n");
@@ -137,6 +132,6 @@ int main(void)
 		handle_request(connfd);
 		close(connfd);
 	}
-	
+	}	
 	exit(0);
 }
