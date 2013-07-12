@@ -17,7 +17,7 @@ int main(int argc, char **argv)
 
    int result;
    struct sockaddr_in servaddr;
-   netToken token = { '#', FUNC_GET, LASER405, FirstSpectral_Blue, 1.0, 2.2 };
+   netToken token = { '#', FUNC_GET, HD_AOTF, FirstSpectral_Blue, 1.0, 2.2 };
    if (argc != 2)
    {
       printf("client ip \n");
@@ -42,6 +42,11 @@ int main(int argc, char **argv)
    while (1)
    {
       write(sockfd, &token, sizeof(token));
+	 if(token.Device==HD_AOTF)
+		 token.Device=HD_XYSCANNER;
+	 else
+
+		 token.Device=HD_AOTF;
       token.Value2 += 1;
       sleep(1);
    }

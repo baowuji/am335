@@ -13,7 +13,7 @@
 #include <netdb.h>
 
 #define TOKEN_SIZE 22
-int fd[2];
+int pipe_aotf[2],pipe_arb[2];
 typedef struct {
 	int a,b;
 }NetData;
@@ -46,8 +46,8 @@ void* aotf(void *arg)
 	while(1)    	
 	{
 		FD_ZERO(&readset);
-		FD_SET(fd[0],&readset);
-		switch(select(fd[0]+1,&readset,NULL,NULL,NULL))
+		FD_SET(pipe_aotf[0],&readset);
+		switch(select(pipe_aotf[0]+1,&readset,NULL,NULL,NULL))
 		{
 			case -1:
 				perror("selct2 error");
@@ -55,8 +55,8 @@ void* aotf(void *arg)
 			case 0:
 				break;
 			default:
-			if (FD_ISSET(fd[0],&readset))
-			{		read(fd[0],&token,sizeof(netToken));
+			if (FD_ISSET(pipe_aotf[0],&readset))
+			{		read(pipe_aotf[0],&token,sizeof(netToken));
 				printf("aotf Freq is %f\n",token.Value2);
 			}
 		}
@@ -66,7 +66,30 @@ void* aotf(void *arg)
 }
 void* arb(void *arg)
 {
+	fd_set readset;
+
+	netToken token;
 	printids("arb thread is \n");
+	while(1)    	
+	{
+		FD_ZERO(&readset);
+		FD_SET(pipe_arb[0],&readset);
+		switch(select(pipe_arb[0]+1,&readset,NULL,NULL,NULL))
+		{
+			case -1:
+				perror("selct3 error");
+				break;
+			case 0:
+				break;
+			default:
+			if (FD_ISSET(pipe_arb[0],&readset))
+			{	
+				read(pipe_arb[0],&token,sizeof(netToken));
+				printf("arb Freq is %f\n",token.Value2);
+			}
+		}
+
+	}
 
 	return (void*)0;
 }
@@ -101,8 +124,19 @@ void handle_request(int sockfd)
 			{
 				if((n=read(sockfd,&token,sizeof(netToken)))>0)
 				printf("%c %d %d %d %f %f\n",token.Device,token.Command,token.Type,token.Status,token.Value1,token.Value2);
-				write(fd[1],&token,sizeof(netToken));
+				switch(token.Device)
+				{
+					case HD_AOTF:
+						write(pipe_aotf[1],&token,sizeof(netToken));
+						break;
+					case HD_XYSCANNER:
+						write(pipe_arb[1],&token,sizeof(netToken));
+						break;
+					default:
+						;
+				}
 			}	
+	
 	}
 	}
 
@@ -116,14 +150,15 @@ int main(void)
 	unsigned int port=8722;
 	int x;
 	
-	if(pipe(fd)<0)
+	if(pipe(pipe_aotf)<0)
 		err_sys("pipe error\n");
 
-
+	if(pipe(pipe_arb)<0)
+		err_sys("pipe error\n");
 
 	pthread_t t_aotf,t_arb;
 	pthread_create(&t_aotf,NULL,aotf,(void*)1);
-//	pthread_create(&t_arb,NULL,arb,(void*)1);
+	pthread_create(&t_arb,NULL,arb,(void*)1);
 //
 	if((listenfd=socket(AF_INET,SOCK_STREAM,IPPROTO_TCP))==-1)
 	{
