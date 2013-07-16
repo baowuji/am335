@@ -188,22 +188,29 @@ int main(void)
 				continue;
 			if(FD_ISSET(sockfd,&rset))
 			{
-    			if((n=read(sockfd,&token,sizeof(netToken)))>0)
-//    			printf("%c %d %d %d %f %f\n",token.Device,token.Command,token.Type,token.Status,token.Value1,token.Value2);
-    			switch(token.Device)
-    			{
-    				case HD_AOTF:
-    					write(pipe_aotf[1],&token,sizeof(netToken));
-    					break;
-    				case HD_XYSCANNER:
-    					write(pipe_arb[1],&token,sizeof(netToken));
-    					break;
-    				default:
-    					;
-    			}
-    		}	
+    			if((n=read(sockfd,&token,sizeof(netToken)))==0)
+				{
+					close(sockfd);
+					FD_CLR(sockfd,&allset);
+					client[i]=-1;
+				}
+				else
+				{
+					switch(token.Device)
+    				{
+    					case HD_AOTF:
+    						write(pipe_aotf[1],&token,sizeof(netToken));
+    						break;
+    					case HD_XYSCANNER:
+    						write(pipe_arb[1],&token,sizeof(netToken));
+    						break;
+    					default:
+    						;
+    				}
+				}
 			if(--nready<=0)
 				break;
+    		}	
     	
     	}
 	}
