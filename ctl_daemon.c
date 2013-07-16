@@ -157,7 +157,7 @@ int main(void)
     	nready=select(maxfd+1,&rset,NULL,NULL,&selTime);
 		
 		write(0,"---\n",5);
-		if(FD_ISSET(listenfd,&rset))
+		if(FD_ISSET(listenfd,&rset))//new client connection
 		{
 			clilen=sizeof(cliaddr);
 			if((connfd=accept(listenfd,(struct sockaddr*)&cliaddr,&clilen))==-1)
@@ -168,7 +168,7 @@ int main(void)
 			for(i=0;i<FD_SETSIZE;i++)
 				if(client[i]<0)
 				{
-					client[i]=connfd;
+					client[i]=connfd;//save descriptor
 					break;
 				}
 			if(i==FD_SETSIZE)
@@ -182,13 +182,13 @@ int main(void)
 				continue;
 		}
 
-		for(i=0;i<=maxi;i++)
+		for(i=0;i<=maxi;i++)//check all clients for data
 		{
 			if((sockfd=client[i])<0)
 				continue;
 			if(FD_ISSET(sockfd,&rset))
 			{
-    			if((n=read(sockfd,&token,sizeof(netToken)))==0)
+    			if((n=read(sockfd,&token,sizeof(netToken)))==0)//connection closed by client
 				{
 					close(sockfd);
 					FD_CLR(sockfd,&allset);
@@ -208,14 +208,11 @@ int main(void)
     						;
     				}
 				}
-			if(--nready<=0)
+			if(--nready<=0)//no more readable descriptors
 				break;
     		}	
     	
     	}
 	}
-	
-	
-	
 	exit(0);
 }
