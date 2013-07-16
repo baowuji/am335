@@ -93,53 +93,6 @@ void* arb(void *arg)
 
 	return (void*)0;
 }
-void handle_request(int sockfd)
-{
-	int n;
-	netToken token;
-	fd_set readset,writeset;
-	struct timeval selTime;
-	int ret;
-	while(1)
-	{
-	FD_ZERO(&readset);
-	FD_ZERO(&writeset);
-	FD_SET(sockfd,&readset);
-	selTime.tv_sec=5;//linux will change the timeval in select ,so it's necessary to initialize it every time.in POSIX ,it's const 
-	selTime.tv_usec=0;
-	ret=select(sockfd+1,&readset,&writeset,NULL,&selTime);
-//	ret=select(sockfd+1,&readset,&writeset,NULL,NULL);
-	switch(ret)
-	{
-		case -1:
-			perror("select1 error\n");
-			break;
-		case 0:
-			printf("select1 time out\n");
-			break;
-		default:	
-			printf("ret=%d\n",ret);
-			if (FD_ISSET(sockfd,&readset))
-			{
-				if((n=read(sockfd,&token,sizeof(netToken)))>0)
-				printf("%c %d %d %d %f %f\n",token.Device,token.Command,token.Type,token.Status,token.Value1,token.Value2);
-				switch(token.Device)
-				{
-					case HD_AOTF:
-						write(pipe_aotf[1],&token,sizeof(netToken));
-						break;
-					case HD_XYSCANNER:
-						write(pipe_arb[1],&token,sizeof(netToken));
-						break;
-					default:
-						;
-				}
-			}	
-	
-	}
-	}
-
-}
 
 int main(void)
 {
@@ -147,8 +100,17 @@ int main(void)
 	struct sockaddr_in servaddr,cliaddr;
 	socklen_t clilen;
 	unsigned int port=8722;
-	int x;
-	
+	int maxi,maxfd,sockfd;
+	int nready,client[FD_SETSIZE];
+	int i;
+	int n;//return value of read
+	netToken token;
+	fd_set rset;
+	fd_set allset;
+	struct timeval selTime;
+
+
+
 	if(pipe(pipe_aotf)<0)
 		err_sys("pipe error\n");
 
@@ -164,8 +126,6 @@ int main(void)
 		perror("socket creation error!\n");
 		exit(1);
 	}
-//	x=fcntl(listenfd,F_GETFL,0);//get socket flags
-//	fcntl(listenfd,F_SETFL,x|O_NONBLOCK);//add non-blocking flag
 
 	bzero(&servaddr,sizeof(servaddr));
 	servaddr.sin_family=AF_INET;
@@ -183,16 +143,71 @@ int main(void)
 	    exit(1);
 	}	
 	  
+	maxfd=listenfd;
+	maxi=-1;
+	for(i=0;i<FD_SETSIZE;i++)
+		client[i]=-1;
+	FD_ZERO(&allset);
+	FD_SET(listenfd,&allset);
 	while(1)
 	{
-		clilen=sizeof(cliaddr);
-		if((connfd=accept(listenfd,(struct sockaddr*)&cliaddr,&clilen))==-1)
+		rset=allset;
+		selTime.tv_sec=5;//linux will change the timeval in select ,so it's necessary to initialize it every time.in POSIX ,it's const 
+    	selTime.tv_usec=0;
+    	nready=select(maxfd+1,&rset,NULL,NULL,&selTime);
+		
+		if(FD_ISSET(listenfd,&rset))
 		{
-			perror("accept error!\n");
+			clilen=sizeof(cliaddr);
+			if((connfd=accept(listenfd,(struct sockaddr*)&cliaddr,&clilen))==-1)
+			{
+				perror("accept error!\n");
+			}
+	
+			for(i=0;i<FD_SETSIZE;i++)
+				if(client[i]<0)
+				{
+					client[i]=connfd;
+					break;
+				}
+			if(i==FD_SETSIZE)
+				err_quit("Too Many clients");
+			FD_SET(connfd,&allset);//add new descriptor to set
+			if(connfd>maxfd)
+				maxfd=connfd;//for select
+			if(i>maxi)
+				maxi=i;//max index of client[]
+			if(--nready<=0)
+				continue;
 		}
-		handle_request(connfd);
-		close(connfd);
+
+		for(i=0;i<=maxi;i++)
+		{
+			if((sockfd=client[i])<0)
+				continue;
+			if(FD_ISSET(sockfd,&rset))
+			{
+    			if((n=read(sockfd,&token,sizeof(netToken)))>0)
+//    			printf("%c %d %d %d %f %f\n",token.Device,token.Command,token.Type,token.Status,token.Value1,token.Value2);
+    			switch(token.Device)
+    			{
+    				case HD_AOTF:
+    					write(pipe_aotf[1],&token,sizeof(netToken));
+    					break;
+    				case HD_XYSCANNER:
+    					write(pipe_arb[1],&token,sizeof(netToken));
+    					break;
+    				default:
+    					;
+    			}
+    		}	
+			if(--nready<=0)
+				break;
+    	
+    	}
 	}
+	
+	
 	
 	exit(0);
 }
