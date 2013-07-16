@@ -100,23 +100,22 @@ void handle_request(int sockfd)
 	fd_set readset,writeset;
 	struct timeval selTime;
 	int ret;
-	selTime.tv_sec=5;
-	selTime.tv_usec=0;
 	while(1)
 	{
 	FD_ZERO(&readset);
 	FD_ZERO(&writeset);
 	FD_SET(sockfd,&readset);
-	
-//	ret=select(sockfd+1,&readset,&writeset,NULL,&selTime);
-	ret=select(sockfd+1,&readset,&writeset,NULL,NULL);
+	selTime.tv_sec=5;//linux will change the timeval in select ,so it's necessary to initialize it every time.in POSIX ,it's const 
+	selTime.tv_usec=0;
+	ret=select(sockfd+1,&readset,&writeset,NULL,&selTime);
+//	ret=select(sockfd+1,&readset,&writeset,NULL,NULL);
 	switch(ret)
 	{
 		case -1:
 			perror("select1 error\n");
 			break;
 		case 0:
-//			printf("select1 time out\n");
+			printf("select1 time out\n");
 			break;
 		default:	
 			printf("ret=%d\n",ret);
