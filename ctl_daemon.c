@@ -156,6 +156,7 @@ int main(void)
     	selTime.tv_usec=0;
     	nready=select(maxfd+1,&rset,NULL,NULL,&selTime);
 		
+		write(0,"---\n",5);
 		if(FD_ISSET(listenfd,&rset))
 		{
 			clilen=sizeof(cliaddr);

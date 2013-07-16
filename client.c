@@ -45,13 +45,12 @@ int main(int argc, char **argv)
 	 if(token.Device==HD_AOTF)
 		 token.Device=HD_XYSCANNER;
 	 else
-
 		 token.Device=HD_AOTF;
-      token.Value2 += 1;
-      sleep(1);
+     token.Value2 += 1;
+     sleep(1);
    }
 
-   shutdown(sockfd,SHUT_RDWR);
+//   shutdown(sockfd,SHUT_RDWR);
    exit(0);
 }
 void str_cli(FILE *fp, int sockfd)
