@@ -53,6 +53,3 @@ int main(int argc, char **argv)
 //   shutdown(sockfd,SHUT_RDWR);
    exit(0);
 }
-void str_cli(FILE *fp, int sockfd)
-{
-}

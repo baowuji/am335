@@ -1,5 +1,3 @@
-#include"apue.h"
-#include"unp.h"
 #include"net_protocol.h"
 #include<pthread.h>
 #include <sys/socket.h>
@@ -112,10 +110,10 @@ int main(void)
 
 
 	if(pipe(pipe_aotf)<0)
-		err_sys("pipe error\n");
+		perror("pipe error\n");
 
 	if(pipe(pipe_arb)<0)
-		err_sys("pipe error\n");
+		perror("pipe error\n");
 
 	pthread_t t_aotf,t_arb;
 	pthread_create(&t_aotf,NULL,aotf,(void*)1);
@@ -172,7 +170,7 @@ int main(void)
 					break;
 				}
 			if(i==FD_SETSIZE)
-				err_quit("Too Many clients");
+				perror("Too Many clients");
 			FD_SET(connfd,&allset);//add new descriptor to set
 			if(connfd>maxfd)
 				maxfd=connfd;//for select

@@ -8,7 +8,7 @@ CC=gcc
 COMPILE.c=$(CC) $(CFLAGS) $(CPPFLAGS) -c 
 LINK.c=$(CC) $(CFLAGS) $(CPPFLAGS) $(LDDIR) $(LDFLAGS)
 LDLIBS= $(EXTRALIBS)
-CFLAGS=-DLINUX  -I$(WKDIR)/include -Wall -g -D_GNU_SOURCE $(EXTRA)
+CFLAGS=-DLINUX  -I$(WKDIR)/include -Wall -Wextra -g -D_GNU_SOURCE $(EXTRA)
 
 # Our library that almost every program needs.
 
