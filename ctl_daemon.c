@@ -12,9 +12,14 @@
 
 #define TOKEN_SIZE 22
 int pipe_aotf[2],pipe_arb[2];
+int pipe_aotfO[2],pipe_arbO[2];
 typedef struct {
 	int a,b;
 }NetData;
+typedef struct{
+	int sockfd;
+	netToken token;
+}cmdToken;
 typedef NetData* pNetData;
 NetData net1;
 pNetData pnet1=&net1;
@@ -40,6 +45,7 @@ void* aotf(void *arg)
 	fd_set readset;
 
 	netToken token;
+	cmdToken ctoken;
 	printids("aotf\n");
 	while(1)    	
 	{
@@ -54,8 +60,12 @@ void* aotf(void *arg)
 				break;
 			default:
 			if (FD_ISSET(pipe_aotf[0],&readset))
-			{		read(pipe_aotf[0],&token,sizeof(netToken));
-				printf("aotf Freq is %f\n",token.Value2);
+			{	
+				read(pipe_aotf[0],&ctoken,sizeof(cmdToken));
+				printf("aotf Freq is %f\n",ctoken.token.Value2);
+				ctoken.token.Value2+=0.01;
+				write(pipe_aotfO[1],&ctoken,sizeof(cmdToken));
+				printf("return\n");
 			}
 		}
 
@@ -66,6 +76,7 @@ void* arb(void *arg)
 {
 	fd_set readset;
 	netToken token;
+	cmdToken ctoken;
 	printids("arb thread is \n");
 	while(1)    	
 	{
@@ -81,8 +92,11 @@ void* arb(void *arg)
 			default:
 			if (FD_ISSET(pipe_arb[0],&readset))
 			{	
-				read(pipe_arb[0],&token,sizeof(netToken));
-				printf("arb Freq is %f\n",token.Value2);
+				read(pipe_arb[0],&ctoken,sizeof(cmdToken));
+				printf("arb Freq is %f\n",ctoken.token.Value2);
+				ctoken.token.Value2+=0.01;
+				write(pipe_arbO[1],&ctoken,sizeof(cmdToken));
+				printf("return\n");
 			}
 		}
 
@@ -102,16 +116,24 @@ int main(void)
 	int i;
 	int n;//return value of read
 	netToken token;
-	fd_set rset;
+	cmdToken ctoken,ctokenO;
+
+	fd_set rset,wset;
 	fd_set allset;
 	struct timeval selTime;
 
-
+	int tmp;
+	char tmpbuf[128];
 
 	if(pipe(pipe_aotf)<0)
 		perror("pipe error\n");
 
 	if(pipe(pipe_arb)<0)
+		perror("pipe error\n");
+	if(pipe(pipe_aotfO)<0)
+		perror("pipe error\n");
+
+	if(pipe(pipe_arbO)<0)
 		perror("pipe error\n");
 
 	pthread_t t_aotf,t_arb;
@@ -146,13 +168,20 @@ int main(void)
 		client[i]=-1;
 	FD_ZERO(&allset);
 	FD_SET(listenfd,&allset);
+
+	FD_ZERO(&wset);
+	FD_SET(pipe_arbO[0],&allset);
+	FD_SET(pipe_aotfO[0],&allset);
+
+	tmp=(pipe_arbO[0]>pipe_aotfO[0])?pipe_arbO[0]:pipe_aotfO[0];
+	maxfd=(maxfd>tmp)?maxfd:tmp;
 	while(1)
 	{
 		rset=allset;
 		selTime.tv_sec=5;//linux will change the timeval in select ,so it's necessary to initialize it every time.in POSIX ,it's const 
     	selTime.tv_usec=0;
    // 	nready=select(maxfd+1,&rset,NULL,NULL,NULL);
-    	nready=select(maxfd+1,&rset,NULL,NULL,&selTime);
+    	nready=select(maxfd+1,&rset,&wset,NULL,&selTime);
 		printf("----\n");	
 		if(FD_ISSET(listenfd,&rset))//new client connection
 		{
@@ -196,10 +225,14 @@ int main(void)
 					switch(token.Device)
     				{
     					case HD_AOTF:
-    						write(pipe_aotf[1],&token,sizeof(netToken));
+							ctoken.sockfd=sockfd;
+							ctoken.token=token;
+    						write(pipe_aotf[1],&ctoken,sizeof(cmdToken));
     						break;
     					case HD_XYSCANNER:
-    						write(pipe_arb[1],&token,sizeof(netToken));
+							ctoken.sockfd=sockfd;
+							ctoken.token=token;
+    						write(pipe_arb[1],&ctoken,sizeof(cmdToken));
     						break;
     					default:
     						;
@@ -210,6 +243,43 @@ int main(void)
     		}	
     	
     	}
-	}
-	exit(0);
-}
+		
+		//handle output here
+		if(FD_ISSET(pipe_aotfO[0],&rset))
+		{
+			read(pipe_aotfO[0],&ctokenO,sizeof(cmdToken));
+			for(i=0;i<FD_SETSIZE;i++)
+			{
+				
+				 if(ctokenO.sockfd==client[i])
+				 {
+					 printf("aotf return\n");
+					write(client[i],&ctokenO.token,sizeof(netToken));
+					break;
+				}
+			}
+			if (i==FD_SETSIZE)
+				printf("%d closed before status return\n",ctokenO.sockfd);
+		
+		}   		
+		if(FD_ISSET(pipe_arbO[0],&rset))
+		{
+			read(pipe_arbO[0],&ctokenO,sizeof(cmdToken));
+			for(i=0;i<FD_SETSIZE;i++)
+			{
+				
+				 if(ctokenO.sockfd==client[i])
+				 {
+					printf("arb return\n");
+					write(client[i],&ctokenO.token,sizeof(netToken));
+					break;
+				}
+			}
+			if (i==FD_SETSIZE)
+				printf("%d closed before status return\n",ctokenO.sockfd);
+		
+		} 
+	}       		
+	exit(0);		
+}           		
+            		
