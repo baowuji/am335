@@ -14,10 +14,10 @@ int main(int argc, char **argv)
 {
    int sockfd;
    int port = 8722;
-
+   int i;
    int result;
    struct sockaddr_in servaddr;
-   netToken token = { '#', FUNC_GET, HD_AOTF, FirstSpectral_Blue, 1.0, 2.2 };
+   netToken token = { '#', HD_AOTF,FUNC_GET, FirstSpectral_Blue,'a', 1.0, 0.2,'a' };
    if (argc != 2)
    {
       printf("client ip \n");
@@ -38,16 +38,18 @@ int main(int argc, char **argv)
       perror("connect error!\n");
       exit(1);
    }
-
-   while (1)
+	i=10;
+	printf("ok\n");
+   while (i-->0)
    {
-      write(sockfd, &token, sizeof(token));
+     write(sockfd, &token, sizeof(token));
+	 // printf("%f\n",token.Value2);
 	 if(token.Device==HD_AOTF)
 		 token.Device=HD_XYSCANNER;
 	 else
 		 token.Device=HD_AOTF;
      token.Value2 += 1;
-     sleep(1);
+//     sleep(1);
    }
 
 //   shutdown(sockfd,SHUT_RDWR);

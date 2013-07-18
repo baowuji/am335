@@ -62,10 +62,12 @@ enum PinholeStatus{Pinhole1 = 0, Pinhole2 = 1, Pinhole3 = 2};                   
 enum DichroicMirrorStatus{DM_None = 0, DM_405 = 1, DM_488 = 2, DM_543 = 3, DM_638 = 4};  // 二色镜转盘选择状态
 
 typedef struct {
+	unsigned char startSign;
 	unsigned char Device;
 	unsigned char Command;
 	unsigned char Type;
 	unsigned char Status;
 	float Value1;
 	float Value2;
+	unsigned char tokenEnd;
 }netToken;

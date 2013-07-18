@@ -65,7 +65,6 @@ void* aotf(void *arg)
 void* arb(void *arg)
 {
 	fd_set readset;
-
 	netToken token;
 	printids("arb thread is \n");
 	while(1)    	
@@ -152,9 +151,9 @@ int main(void)
 		rset=allset;
 		selTime.tv_sec=5;//linux will change the timeval in select ,so it's necessary to initialize it every time.in POSIX ,it's const 
     	selTime.tv_usec=0;
+   // 	nready=select(maxfd+1,&rset,NULL,NULL,NULL);
     	nready=select(maxfd+1,&rset,NULL,NULL,&selTime);
-		
-		write(0,"---\n",5);
+		printf("----\n");	
 		if(FD_ISSET(listenfd,&rset))//new client connection
 		{
 			clilen=sizeof(cliaddr);
