@@ -1,3 +1,7 @@
+#ifndef _NET_PROTOCOL_H
+#define _NET_PROTOCOL_H
+
+#define TOKEN_SIZE 22
 // Device
 #define HD_READY          0x01    // 开始连接
 #define HD_CANCEL         0x02    // 取消连接
@@ -71,3 +75,4 @@ typedef struct {
 	float Value2;
 	unsigned char tokenEnd;
 }netToken;
+#endif 
