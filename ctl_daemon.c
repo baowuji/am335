@@ -84,7 +84,21 @@ int main(void)
 		selTime.tv_usec=0;
 		// 	nready=select(maxfd+1,&rset,NULL,NULL,NULL);
 		nready=select(maxfd+1,&rset,&wset,NULL,&selTime);
-		printf("----\n");	
+
+		//handle output here
+		if(FD_ISSET(pipe_aotfO[0],&rset))
+		{
+			device_echo(pipe_aotfO[0],client);  		
+			nready--;
+		}
+		if(FD_ISSET(pipe_arbO[0],&rset))
+		{
+			device_echo(pipe_arbO[0],client);  		
+			nready--;
+		}
+	printf("----\n");	
+
+
 		if(FD_ISSET(listenfd,&rset))//new client connection
 		{
 			clilen=sizeof(cliaddr);
@@ -146,15 +160,6 @@ int main(void)
 
 		}
 
-		//handle output here
-		if(FD_ISSET(pipe_aotfO[0],&rset))
-		{
-			device_echo(pipe_aotfO[0],client);  		
-		}
-		if(FD_ISSET(pipe_arbO[0],&rset))
-		{
-			device_echo(pipe_arbO[0],client);  		
-		}
 	}       		
 	exit(0);		
 }           		

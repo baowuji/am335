@@ -39,7 +39,7 @@ int main(int argc, char **argv)
       perror("connect error!\n");
       exit(1);
    }
-	i=10;
+	i=101;
 	printf("ok\n");
    while (i-->0)
    {
@@ -50,7 +50,7 @@ int main(int argc, char **argv)
 	 else
 		 token.Device=HD_AOTF;
      token.Value2 += 1;
-//     sleep(1);
+     sleep(1);
 	 read(sockfd,&tokenIn,sizeof(tokenIn));
 	 printf("return %f\n",tokenIn.Value2);
    }
