@@ -75,8 +75,7 @@ int main(void)
 	FD_SET(pipe_arbO[0],&allset);
 	FD_SET(pipe_aotfO[0],&allset);
 
-	tmp=(pipe_arbO[0]>pipe_aotfO[0])?pipe_arbO[0]:pipe_aotfO[0];
-	maxfd=(maxfd>tmp)?maxfd:tmp;
+	maxfd=bigger(maxfd,bigger(pipe_arbO[0],pipe_aotfO[0]));
 	while(1)
 	{
 		rset=allset;
@@ -96,7 +95,7 @@ int main(void)
 			device_echo(pipe_arbO[0],client);  		
 			nready--;
 		}
-	printf("----\n");	
+		printf("----\n");	
 
 
 		if(FD_ISSET(listenfd,&rset))//new client connection
@@ -113,15 +112,15 @@ int main(void)
 					client[i]=connfd;//save descriptor
 					break;
 				}
-				if(i==FD_SETSIZE)
-					perror("Too Many clients");
-				FD_SET(connfd,&allset);//add new descriptor to set
-				if(connfd>maxfd)
-					maxfd=connfd;//for select
-				if(i>maxi)
-					maxi=i;//max index of client[]
-				if(--nready<=0)
-					continue;
+			if(i==FD_SETSIZE)
+				perror("Too Many clients");
+			FD_SET(connfd,&allset);//add new descriptor to set
+			if(connfd>maxfd)
+				maxfd=connfd;//for select
+			if(i>maxi)
+				maxi=i;//max index of client[]
+			if(--nready<=0)
+				continue;
 		}
 
 		for(i=0;i<=maxi;i++)//check all clients for data
@@ -140,18 +139,18 @@ int main(void)
 				{
 					switch(token.Device)
 					{
-					case HD_AOTF:
-						ctoken.sockfd=sockfd;
-						ctoken.token=token;
-						write(pipe_aotf[1],&ctoken,sizeof(cmdToken));
-						break;
-					case HD_XYSCANNER:
-						ctoken.sockfd=sockfd;
-						ctoken.token=token;
-						write(pipe_arb[1],&ctoken,sizeof(cmdToken));
-						break;
-					default:
-						;
+						case HD_AOTF:
+							ctoken.sockfd=sockfd;
+							ctoken.token=token;
+							write(pipe_aotf[1],&ctoken,sizeof(cmdToken));
+							break;
+						case HD_XYSCANNER:
+							ctoken.sockfd=sockfd;
+							ctoken.token=token;
+							write(pipe_arb[1],&ctoken,sizeof(cmdToken));
+							break;
+						default:
+							;
 					}
 				}
 				if(--nready<=0)//no more readable descriptors

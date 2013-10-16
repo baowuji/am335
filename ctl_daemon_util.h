@@ -60,4 +60,8 @@ int device_echo(int pipeDes,int client[])
 	
 	return 0;
 }
+int bigger(int a,int b)
+{
+	return a>b?a:b;
+}
 #endif

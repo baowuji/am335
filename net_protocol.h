@@ -69,10 +69,7 @@ typedef struct {
 	unsigned char startSign;
 	unsigned char Device;
 	unsigned char Command;
-	unsigned char Type;
-	unsigned char Status;
-	float Value1;
-	float Value2;
+	unsigned char Val[30];
 	unsigned char tokenEnd;
 }netToken;
 #endif 

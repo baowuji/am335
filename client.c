@@ -50,7 +50,7 @@ int main(int argc, char **argv)
 	 else
 		 token.Device=HD_AOTF;
      token.Value2 += 1;
-     sleep(1);
+//     sleep(1);
 	 read(sockfd,&tokenIn,sizeof(tokenIn));
 	 printf("return %f\n",tokenIn.Value2);
    }
