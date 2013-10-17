@@ -28,4 +28,6 @@ void printids(const char *s);
 
 
 int device_echo(int pipeDes,int client[]);
+
+int bigger(int a,int b);
 #endif
