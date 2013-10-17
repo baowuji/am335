@@ -2,6 +2,7 @@
 #include "ctl_daemon_util.h"
 #include"arb.h"
 #include"aotf.h"
+#include"laser.h"
 
 
 int main(void)
@@ -20,11 +21,15 @@ int main(void)
 	fd_set rset,wset;
 	fd_set allset;
 	struct timeval selTime;
-	pipeInOut Paotf,Parb;
+	pipeInOut Paotf,Parb,Plaser;
 
 	int pipe_aotf[2],pipe_arb[2];
 	int pipe_aotfO[2],pipe_arbO[2];
-
+	int pipe_laser[2],pipe_laserO[2];
+	if(pipe(pipe_laser)<0)
+		perror("pipe error\n");
+	if(pipe(pipe_laserO)<0)
+		perror("pipe error\n");
 	if(pipe(pipe_aotf)<0)
 		perror("pipe error\n");
 	if(pipe(pipe_arb)<0)
@@ -36,10 +41,12 @@ int main(void)
 
 	Paotf.pi=pipe_aotf[0];Paotf.po=pipe_aotfO[1];
 	Parb.pi=pipe_arb[0];Parb.po=pipe_arbO[1];
+	Plaser.pi=pipe_laser[0];Plaser.po=pipe_laserO[1];
 
-	pthread_t t_aotf,t_arb;
+	pthread_t t_aotf,t_arb,t_laser;
 	pthread_create(&t_aotf,NULL,aotf,(void*)&Paotf);
 	pthread_create(&t_arb,NULL,arb,(void*)&Parb);
+	pthread_create(&t_laser,NULL,laserCtl,(void*)&Plaser);
 	//
 	printf("create thread ok\n");
 	if((listenfd=socket(AF_INET,SOCK_STREAM,IPPROTO_TCP))==-1)
@@ -74,8 +81,11 @@ int main(void)
 	FD_ZERO(&wset);
 	FD_SET(pipe_arbO[0],&allset);
 	FD_SET(pipe_aotfO[0],&allset);
-
+	FD_SET(pipe_laserO[0],&allset);
 	maxfd=bigger(maxfd,bigger(pipe_arbO[0],pipe_aotfO[0]));
+	maxfd=bigger(maxfd,pipe_laserO[0]);
+
+
 	while(1)
 	{
 		rset=allset;
