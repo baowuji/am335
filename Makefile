@@ -15,8 +15,10 @@ EXTRALIBS=-pthread
 
 objects=ctl_daemon_util.o can.o arb.o aotf.o laser.o
 PROGS = ctl_daemon 
-all:ctl_daemon
+all:ctl_daemon client
 
+client: client.c
+	gcc client.c -lm -o client	
 ctl_daemon:$(objects) ctl_daemon.c
 	$(CC) $(objects)  ctl_daemon.c -o ctl_daemon $(CFLAGS) $(LDLIBS) libsocketcan.a 
 $(objectc):$(objects).c

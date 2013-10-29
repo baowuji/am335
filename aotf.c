@@ -28,7 +28,7 @@ void* aotf(void *arg)
 			{	
 				read(pipe->pi,&ctoken,sizeof(cmdToken));
 				write(pipe->po,&ctoken,sizeof(cmdToken));
-				printf("return\n");
+				printf("atof config return\n");
 			}
 		}
 

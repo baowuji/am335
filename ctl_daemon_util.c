@@ -21,11 +21,14 @@ int device_echo(int pipeDes,int client[])
 	for(i=0;i<FD_SETSIZE;i++)
 	{
 
-		if(ctoken.sockfd==client[i])
-		{
+//		if(ctoken.sockfd==client[i])
+//		{
+//			write(client[i],&ctoken.token,sizeof(netToken));
+//			break;
+//		}
+		//echo to every connected client
+		if(client[i]!=-1)
 			write(client[i],&ctoken.token,sizeof(netToken));
-			break;
-		}
 	}
 	if (i==FD_SETSIZE)
 	{

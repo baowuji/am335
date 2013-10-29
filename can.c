@@ -1,13 +1,6 @@
-//
-//Code for LSCM - cansend.c
-//Copyright (C) 2013 SIBET. - http://www.sibet.ac.cn/
-//Edited by Gao Fei in February 21, 2013
-//
 #define LSCM_DEBUG
 #define BUF_SIZ	(255)
 #include <libsocketcan.h>
-#include "can_config.h"
-#include "debug.h"
 #include <errno.h>
 #include <getopt.h>
 #include <libgen.h>
@@ -29,6 +22,24 @@
 #include <linux/can.h>
 #include <linux/can/raw.h>
 
+#include"dcan.h"
+#include "can_config.h"
+#include "debug.h"
+#include"ctl_daemon_util.h"
+void can_init(void)
+{
+	can_stop(1);
+	//  can_start(0, CAN_BITRATE);
+	can_start(1, "50000");
+}
+unsigned int canidGen(unsigned char cmd,unsigned char dest,unsigned char source)
+{
+	return cmd|dest<<1|source<<6;
+}
+unsigned char getCanAddr(unsigned int canId)
+{
+	return (canId>>1)|0x001f;
+}
 //
 //can_send_sff - send standard format frame
 //@can_index: can index
@@ -143,8 +154,9 @@ int add_filter(u_int32_t id, u_int32_t mask)
 //@recv_data: recv frame data
 //if successed return 0, else return 1
 //
-int can_recv_filter(int can_index, unsigned int can_id, unsigned int can_mask,
-		unsigned int *recv_id, unsigned char *recv_dlc, unsigned char *recv_data)
+
+static int running=1;
+int can_recv_filter(int can_index, int filterNum,canFilter* filters,void*arg)
 {
 	struct can_frame frame;
 	struct ifreq ifr;
@@ -152,8 +164,16 @@ int can_recv_filter(int can_index, unsigned int can_id, unsigned int can_mask,
 	char *interface = "can0";
 	char buf[BUF_SIZ];
 	int family = PF_CAN, type = SOCK_RAW, proto = CAN_RAW;
-	int n = 0, err;
+	int n = 0;
 	int nbytes, i;
+
+	cmdToken ctoken;
+	unsigned int recv_id;
+	unsigned char recv_dlc; 
+	unsigned char* recv_data=ctoken.token.Val;
+	pipeInOut *pipe=(pipeInOut*)arg;
+	printids("can daemon starts\n");
+
 
 	//parameter check
 	if ((can_index != 0) && (can_index != 1))
@@ -165,7 +185,8 @@ int can_recv_filter(int can_index, unsigned int can_id, unsigned int can_mask,
 	if (1 == can_index)
 		interface = "can1";
 
-	add_filter(can_id, can_mask);
+	for(i=0;i<filterNum;i++)
+		add_filter(filters[i].can_id,filters[i].can_mask); //each device matches one filter
 
 	if ((s = socket(family, type, proto)) < 0) {
 		perror("socket");
@@ -194,40 +215,88 @@ int can_recv_filter(int can_index, unsigned int can_id, unsigned int can_mask,
 	}
 
 	APP_INFOR("can_recv_filter: %s waiting......\n", interface);
-
-	if ((nbytes = read(s, &frame, sizeof(struct can_frame))) < 0)
-	{
-		perror("read");
-		return 1;
-	}
-	else
-	{
-		*recv_id = frame.can_id;
-		*recv_dlc = frame.can_dlc;
-
-		if (frame.can_id & CAN_EFF_FLAG)
-			n = snprintf(buf, BUF_SIZ, "<0x%08x> ", frame.can_id & CAN_EFF_MASK);
-		else
-			n = snprintf(buf, BUF_SIZ, "<0x%03x> ", frame.can_id & CAN_SFF_MASK);
-
-		n += snprintf(buf + n, BUF_SIZ - n, "[%d] ", frame.can_dlc);
-
-		for (i = 0; i < frame.can_dlc; i++) {
-			n += snprintf(buf + n, BUF_SIZ - n, "0x%02x ", frame.data[i]);
-			recv_data[i] = frame.data[i];
+	while(running){
+		if ((nbytes = read(s, &frame, sizeof(struct can_frame))) < 0)
+		{
+			perror("read");
+			return 1;
 		}
+		else
+		{
+			recv_id = frame.can_id;
+			recv_dlc = frame.can_dlc;
 
-		if (frame.can_id & CAN_RTR_FLAG)
-			n += snprintf(buf + n, BUF_SIZ - n, "remote request");
+			if (frame.can_id & CAN_EFF_FLAG)
+				n = snprintf(buf, BUF_SIZ, "<0x%08x> ", frame.can_id & CAN_EFF_MASK);
+			else
+				n = snprintf(buf, BUF_SIZ, "<0x%03x> ", frame.can_id & CAN_SFF_MASK);
 
-		APP_INFOR("can_recv_filter: %s %s\n", interface, buf);
+			n += snprintf(buf + n, BUF_SIZ - n, "[%d] ", frame.can_dlc);
 
-		n = 0;
+			for (i = 0; i < frame.can_dlc; i++) {
+				n += snprintf(buf + n, BUF_SIZ - n, "0x%02x ", frame.data[i]);
+				recv_data[i] = frame.data[i];
+			}
+
+			if (frame.can_id & CAN_RTR_FLAG)
+				n += snprintf(buf + n, BUF_SIZ - n, "remote request");
+
+			APP_INFOR("can_recv_filter: %s %s\n", interface, buf);
+			switch(getCanAddr(recv_id))
+			{
+				case CANADDR_LASER:
+					ctoken.token.Device=HD_LASER;
+					break;
+				case CANADDR_SLIT:
+					ctoken.token.Device=HD_SLIT;
+					break;
+				case CANADDR_DICHROIC:
+					ctoken.token.Device=HD_DICHROIC;
+					break;
+				case CANADDR_PINHOLE:
+					ctoken.token.Device=HD_PINHOLE;
+					break;
+				default:
+					break;
+			}
+			write(pipe->po,&ctoken,sizeof(cmdToken));
+			n = 0;
+		}
 	}
 
 	return 0;
 }
 
+void* candaemon(void*arg)
+{
+
+	int can_index=1;
+	unsigned int can_id;
+	unsigned int can_mask=0x3fe;//receive the data the local controllers send without command
+	int filterNum;
+	canFilter laserF={
+		.can_id=canidGen(CMD_SET,CANADDR_BEAGLEBONE,CANADDR_LASER),
+		.can_mask=0x3fe};
+	canFilter slitF={
+		.can_id=canidGen(CMD_SET,CANADDR_BEAGLEBONE,CANADDR_SLIT),
+		.can_mask=0x3fe};
+	canFilter pinholeF={
+		.can_id=canidGen(CMD_SET,CANADDR_BEAGLEBONE,CANADDR_PINHOLE),
+		.can_mask=0x3fe};
+	canFilter dichroicF={
+		.can_id=canidGen(CMD_SET,CANADDR_BEAGLEBONE,CANADDR_DICHROIC),
+		.can_mask=0x3fe};
+
+	canFilter filters[CAN_DEV_MAX_NUM];
+	//add filter of device here.
+	filters[0]=laserF;
+	filters[1]=slitF;
+	filters[2]=pinholeF;
+	filters[3]=dichroicF;
+	filterNum=4;
+	can_recv_filter(can_index,filterNum,filters,arg); 
+	return;
+}
 //
 //Code for LSCM - canconfig.c
 //Copyright (C) 2013 SIBET. - http://www.sibet.ac.cn/
@@ -286,7 +355,7 @@ const char *config_keywords[] = {
 static inline int find_str(const char** haystack, unsigned int stack_size,
 		const char* needle)
 {
-	int i, found = 0;
+	unsigned int i, found = 0;
 
 	for (i = 0; i < stack_size; i++) {
 		if (!strcmp(needle, haystack[i])) {
@@ -493,7 +562,7 @@ static void do_show_bittiming_const(const char *name)
 				btc.brp_min, btc.brp_max, btc.brp_inc);
 }
 
-static void cmd_bittiming_const(int argc, char *argv[], const char *name)
+static void cmd_bittiming_const(const char *name)
 {
 	do_show_bittiming_const(name);
 }
@@ -514,7 +583,7 @@ static void do_show_state(const char *name)
 		fprintf(stderr, "%s: unknown state\n", name);
 }
 
-static void cmd_state(int argc, char *argv[], const char *name)
+static void cmd_state( const char *name)
 {
 	do_show_state(name);
 }
@@ -534,7 +603,7 @@ static void do_show_clockfreq(const char *name)
 	fprintf(stdout, "%s clock freq: %u\n", name, clock.freq);
 }
 
-static void cmd_clockfreq(int argc, char *argv[], const char *name)
+static void cmd_clockfreq(const char *name)
 {
 	do_show_clockfreq(name);
 }
@@ -550,7 +619,7 @@ static void do_restart(const char *name)
 	}
 }
 
-static void cmd_restart(int argc, char *argv[], const char *name)
+static void cmd_restart(const char *name)
 {
 	do_restart(name);
 }
@@ -566,7 +635,7 @@ static void do_start(const char *name)
 	}
 }
 
-static void cmd_start(int argc, char *argv[], const char *name)
+static void cmd_start(const char *name)
 {
 	do_start(name);
 }
@@ -582,7 +651,7 @@ static void do_stop(const char *name)
 	}
 }
 
-static void cmd_stop(int argc, char *argv[], const char *name)
+static void cmd_stop(const char *name)
 {
 	do_stop(name);
 }
@@ -748,12 +817,12 @@ static void do_show_berr_counter(const char *name)
 	}
 }
 
-static void cmd_berr_counter(int argc, char *argv[], const char *name)
+static void cmd_berr_counter(const char *name)
 {
 	do_show_berr_counter(name);
 }
 
-static void cmd_baudrate(int argc, char *argv[], const char *name)
+static void cmd_baudrate(const char *name)
 {
 	fprintf(stderr, "%s: baudrate is deprecated, pleae use bitrate\n",
 			name);
@@ -802,7 +871,7 @@ int can_config(int argc, char *argv[])
 
 	while (argc-- > 0) {
 		if (!strcmp(argv[0], "baudrate"))
-			cmd_baudrate(argc, argv, name);
+			cmd_baudrate( name);
 		if (!strcmp(argv[0], "bitrate"))
 			cmd_bitrate(argc, argv, name);
 		if (!strcmp(argv[0], "bittiming"))
@@ -810,21 +879,21 @@ int can_config(int argc, char *argv[])
 		if (!strcmp(argv[0], "ctrlmode"))
 			cmd_ctrlmode(argc, argv, name);
 		if (!strcmp(argv[0], "restart"))
-			cmd_restart(argc, argv, name);
+			cmd_restart( name);
 		if (!strcmp(argv[0], "start"))
-			cmd_start(argc, argv, name);
+			cmd_start(name);
 		if (!strcmp(argv[0], "stop"))
-			cmd_stop(argc, argv, name);
+			cmd_stop(name);
 		if (!strcmp(argv[0], "restart-ms"))
 			cmd_restart_ms(argc, argv, name);
 		if (!strcmp(argv[0], "state"))
-			cmd_state(argc, argv, name);
+			cmd_state(name);
 		if (!strcmp(argv[0], "clockfreq"))
-			cmd_clockfreq(argc, argv, name);
+			cmd_clockfreq(name);
 		if (!strcmp(argv[0], "bittiming-constants"))
-			cmd_bittiming_const(argc, argv, name);
+			cmd_bittiming_const(name);
 		if (!strcmp(argv[0], "berr-counter"))
-			cmd_berr_counter(argc, argv, name);
+			cmd_berr_counter( name);
 		argv++;
 	}
 

@@ -3,6 +3,7 @@
 #include"arb.h"
 #include"aotf.h"
 #include"laser.h"
+#include"dcan.h"
 
 
 int main(void)
@@ -21,11 +22,12 @@ int main(void)
 	fd_set rset,wset;
 	fd_set allset;
 	struct timeval selTime;
-	pipeInOut Paotf,Parb,Plaser;
+	pipeInOut Paotf,Parb,Plaser,Pcan;
 
 	int pipe_aotf[2],pipe_arb[2];
 	int pipe_aotfO[2],pipe_arbO[2];
 	int pipe_laser[2],pipe_laserO[2];
+	int pipe_can[2],pipe_canO[2];
 	if(pipe(pipe_laser)<0)
 		perror("pipe error\n");
 	if(pipe(pipe_laserO)<0)
@@ -38,15 +40,23 @@ int main(void)
 		perror("pipe error\n");
 	if(pipe(pipe_arbO)<0)
 		perror("pipe error\n");
+	if(pipe(pipe_can)<0)
+		perror("pipe error\n");
+	if(pipe(pipe_canO)<0)
+		perror("pipe error\n");
 
 	Paotf.pi=pipe_aotf[0];Paotf.po=pipe_aotfO[1];
 	Parb.pi=pipe_arb[0];Parb.po=pipe_arbO[1];
 	Plaser.pi=pipe_laser[0];Plaser.po=pipe_laserO[1];
+	Pcan.pi=pipe_can[0];Pcan.po=pipe_canO[1];
 
-	pthread_t t_aotf,t_arb,t_laser;
+	can_init();
+
+	pthread_t t_aotf,t_arb,t_laser,t_can;
 	pthread_create(&t_aotf,NULL,aotf,(void*)&Paotf);
 	pthread_create(&t_arb,NULL,arb,(void*)&Parb);
 	pthread_create(&t_laser,NULL,laserCtl,(void*)&Plaser);
+	pthread_create(&t_can,NULL,candaemon,(void*)&Pcan);
 	//
 	printf("create thread ok\n");
 	if((listenfd=socket(AF_INET,SOCK_STREAM,IPPROTO_TCP))==-1)
@@ -82,8 +92,11 @@ int main(void)
 	FD_SET(pipe_arbO[0],&allset);
 	FD_SET(pipe_aotfO[0],&allset);
 	FD_SET(pipe_laserO[0],&allset);
+	FD_SET(pipe_canO[0],&allset);
 	maxfd=bigger(maxfd,bigger(pipe_arbO[0],pipe_aotfO[0]));
 	maxfd=bigger(maxfd,pipe_laserO[0]);
+	maxfd=bigger(maxfd,pipe_canO[0]);
+
 
 
 	while(1)
@@ -105,6 +118,12 @@ int main(void)
 			device_echo(pipe_arbO[0],client);  		
 			nready--;
 		}
+		if(FD_ISSET(pipe_canO[0],&rset))
+		{
+			device_echo(pipe_canO[0],client);  		
+			nready--;
+		}
+
 		printf("----\n");	
 
 
@@ -147,6 +166,7 @@ int main(void)
 				}
 				else
 				{
+					printf("receive 1 data\n");
 					switch(token.Device)
 					{
 						case HD_AOTF:
@@ -154,11 +174,17 @@ int main(void)
 							ctoken.token=token;
 							write(pipe_aotf[1],&ctoken,sizeof(cmdToken));
 							break;
-						case HD_XYSCANNER:
+						case HD_ARB:
 							ctoken.sockfd=sockfd;
 							ctoken.token=token;
 							write(pipe_arb[1],&ctoken,sizeof(cmdToken));
 							break;
+						case HD_LASER:
+							ctoken.sockfd=sockfd;
+							ctoken.token=token;
+							write(pipe_laser[1],&ctoken,sizeof(cmdToken));
+							break;
+
 						default:
 							;
 					}
